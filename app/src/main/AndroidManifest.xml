@@ -321,6 +321,11 @@
             android:name=".activities.preview.LayoutPreviewActivity"
             android:configChanges="orientation|screenSize" />
 
+        <activity 
+            android:name="pro.sketchware.activities.PreviewRunnerActivity" 
+            android:theme="@android:style/Theme.DeviceDefault" 
+            android:label="In-App Run Preview" />
+
         <meta-data
             android:name="firebase_crashlytics_collection_enabled"
             android:value="true" />
