@@ -20,7 +20,6 @@ import pro.sketchware.tools.ViewBeanParser;
 import java.io.File;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
-import java.util.HashMap;
 
 import dalvik.system.DexClassLoader;
 
@@ -35,7 +34,6 @@ public class PreviewRunnerActivity extends Activity {
     private Object targetActivityLogicInstance;
     private Class<?> targetActivityClass;
 
-    // LayoutPreviewActivity ၏ Update အသစ်နှင့် အညီ ကန့်သတ်ချက်များ ပြင်ဆင်ခြင်း
     public static void startPreview(Context context, String dexPath, String packageName) {
         Intent intent = new Intent(context, PreviewRunnerActivity.class);
         intent.putExtra(EXTRA_DEX_PATH, dexPath);
@@ -57,7 +55,7 @@ public class PreviewRunnerActivity extends Activity {
 
         String dexPath = getIntent().getStringExtra(EXTRA_DEX_PATH);
         String packageName = getIntent().getStringExtra(EXTRA_PACKAGE_NAME);
-        String xmlContent = getIntent().getStringExtra(EXTRA_XML_CONTENT); // UI ဒေတာ ရယူခြင်း
+        String xmlContent = getIntent().getStringExtra(EXTRA_XML_CONTENT);
 
         if (dexPath == null || !new File(dexPath).exists()) {
             showError("DEX ဖိုင် ရှာမတွေ့ပါ။ ပရောဂျက်ကို အရင်ဆုံး Compile လုပ်ပေးပါ။");
@@ -67,7 +65,7 @@ public class PreviewRunnerActivity extends Activity {
         // ၁။ နောက်ကွယ်က ကုဒ် (DEX) ကို အရင် Load လုပ်ခြင်း
         loadTargetDexLogic(dexPath, packageName);
 
-        // ၂။ UI ကို စမ်းသပ်ဆွဲတင်ခြင်း (UI Render)
+        // ၂။ UI ကို စမ်းသပ်ဆွဲတင်ခြင်း
         if (xmlContent != null && !xmlContent.isEmpty()) {
             renderTargetUi(xmlContent);
         } else {
@@ -91,7 +89,6 @@ public class PreviewRunnerActivity extends Activity {
             String mainActivityClassName = packageName + ".MainActivity";
             try {
                 targetActivityClass = classLoader.loadClass(mainActivityClassName);
-                // Logic များ သုံးနိုင်ရန် သီးသန့် Instance တစ်ခု ဆောက်ထားခြင်း
                 targetActivityLogicInstance = targetActivityClass.getConstructor().newInstance();
             } catch (Exception e) {
                 Log.e("PreviewRunner", "MainActivity Logic class ကို ရှာမတွေ့ပါ သို့မဟုတ် မဆောက်နိုင်ပါ");
@@ -103,11 +100,10 @@ public class PreviewRunnerActivity extends Activity {
     }
 
     /**
-     * Sketchware ရဲ့ ViewBeanParser ကို သုံးပြီး Install လုပ်စရာမလိုဘဲ UI ကို ချက်ချင်း ဖော်ပြခြင်း
+     * ViewBeanParser ကို သုံးပြီး Install လုပ်စရာမလိုဘဲ UI ကို ချက်ချင်း ဖော်ပြခြင်း
      */
     private void renderTargetUi(String xmlContent) {
         try {
-            // Sketchware Pro ရဲ့ Parser ကို အသုံးပြု၍ XML အား View Object အဖြစ်ပြောင်းလဲခြင်း
             ViewBeanParser parser = new ViewBeanParser(xmlContent);
             ArrayList<ViewBean> viewBeans = parser.parse();
 
@@ -116,16 +112,14 @@ public class PreviewRunnerActivity extends Activity {
                 return;
             }
 
-            // [အဓိကအချက်] Sketchware ရဲ့ မူရင်း Layoutဆွဲစနစ် (ViewPane သို့မဟုတ် DynamicInflater) ပုံစံအတိုင်း
-            // လက်ရှိ Activity ရဲ့ Context ပေါ်မှာတင် UI ဆွဲတင်လိုက်ခြင်း ဖြစ်သည်။
             LinearLayout rootLayout = new LinearLayout(this);
             rootLayout.setOrientation(LinearLayout.VERTICAL);
             rootLayout.setLayoutParams(new LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT,
                     ViewGroup.LayoutParams.MATCH_PARENT
-            ));
+                ));
 
-            // View များကို စမ်းသပ်မောင်းနှင်ရန် ပတ်လမ်းကြောင်း Loop ပတ်ခြင်း
+            // View များကို ပတ်လမ်းကြောင်း Loop ပတ်ခြင်း
             for (ViewBean bean : viewBeans) {
                 View elementView = createRuntimeViewFromBean(bean);
                 if (elementView != null) {
@@ -143,30 +137,41 @@ public class PreviewRunnerActivity extends Activity {
     }
 
     /**
-     * ViewBean မှ တစ်ဆင့် တကယ့် Android View (Button, TextView) များကို ကွန်ပျူတာစနစ်အတုဖြင့် ပြောင်းလဲပေးခြင်း
+     * ViewBean မှ တစ်ဆင့် တကယ့် Android View (Button, TextView) များကို ဖန်တီးပေးခြင်း
      */
     private View createRuntimeViewFromBean(ViewBean bean) {
         try {
             View view;
-            // Bean Type အလိုက် ခွဲခြားခြင်း (Sketchware မူရင်း Logic အတိုင်း စဉ်းစားခြင်း)
-            if (bean.type == 1) { // ဥပမာ - Button
+            
+            // ပြင်ဆင်ချက် - TextBean Error ကျော်လွှားရန် စာသား (String) အဖြစ် စနစ်တကျ ပြောင်းလဲခြင်း
+            String elementText = "";
+            if (bean.text != null) {
+                elementText = bean.text.toString(); 
+            } else {
+                elementText = bean.id; // စာသားမရှိပါက View ID ကိုပဲ ခေတ္တပြပေးရန်
+            }
+
+            // Bean Type အလိုက် ခွဲခြားခြင်း
+            if (bean.type == 1) { // Button
                 android.widget.Button btn = new android.widget.Button(this);
-                btn.setText(bean.text);
+                btn.setText(elementText); 
                 view = btn;
-            } else if (bean.type == 2) { // ဥပမာ - TextView
+            } else if (bean.type == 2) { // TextView
                 TextView tv = new TextView(this);
-                tv.setText(bean.text);
-                tv.setTextSize(bean.textSize);
+                tv.setText(elementText);  
+                
+                // ပြင်ဆင်ချက် - textSize variable အမှားအတွက် စိတ်ချရသော default တန်ဖိုးပေးခြင်း
+                tv.setTextSize(16); 
                 view = tv;
             } else {
-                // အခြား View များအတွက် သာမန် View သတ်မှတ်ခြင်း
+                // အခြား View များအတွက်
                 TextView genericView = new TextView(this);
-                genericView.setText("[" + bean.id + "] - " + bean.getClass().getSimpleName());
+                genericView.setText("[" + bean.id + "]");
                 genericView.setPadding(16, 16, 16, 16);
                 view = genericView;
             }
 
-            // ⚠️ [အဆင့်မြင့်စနစ်] ခလုတ်နှိပ်သည့် Logic (onClick) ကို Target DEX ထဲက ကုဒ်များနှင့် ချိတ်ပေးခြင်း
+            // ခလုတ်နှိပ်သည့် Logic (onClick) ကို တိုက်ရိုက်ချိတ်ပေးခြင်း
             view.setOnClickListener(v -> {
                 triggerDexMethod(bean.id + "_onClick", v);
             });
@@ -183,12 +188,10 @@ public class PreviewRunnerActivity extends Activity {
     private void triggerDexMethod(String methodName, View view) {
         if (targetActivityClass == null || targetActivityLogicInstance == null) return;
         try {
-            // Target Class ထဲတွင် ထို ခလုတ်၏ event method ရှိမရှိ ရှာဖွေခြင်း
             Method targetMethod = targetActivityClass.getDeclaredMethod(methodName, View.class);
             targetMethod.setAccessible(true);
             targetMethod.invoke(targetActivityLogicInstance, view);
         } catch (NoSuchMethodException e) {
-            // Method မရှိပါက ပုံမှန်အတိုင်း တုံ့ပြန်ရန်
             Toast.makeText(this, "Event '" + methodName + "' အတွက် ကုဒ် မရေးရသေးပါ။", Toast.LENGTH_SHORT).show();
         } catch (Exception e) {
             Log.e("PreviewRunner", "Method Invoke Error: " + e.getMessage());
