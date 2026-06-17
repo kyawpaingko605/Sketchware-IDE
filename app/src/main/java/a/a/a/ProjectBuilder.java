@@ -801,17 +801,33 @@ public class ProjectBuilder {
     }
 
     /**
-     * In-App Run Preview စနစ်အတွက် ပြင်ဆင်ထားသော signDebugApk Method ဖြစ်ပါသည်။
-     * APK ဆက်မဆောက်တော့ဘဲ ထွက်လာသည့် classes.dex ကို Dynamic Load လုပ်ရန် PreviewRunnerActivity ကို တိုက်ရိုက် လှမ်းခေါ်ပေးပါမည်။
+     * Sign the debug APK file with testkey.
+     * <p>
+     * This method uses apksigner, but kellinwood's zipsigner as fallback.
      */
     public void signDebugApk() throws GeneralSecurityException, IOException, ClassNotFoundException, IllegalAccessException, InstantiationException {
-        String dexPath = yq.binDirectoryPath + File.separator + "dex" + File.separator + "classes.dex";
-        
-        if (!new File(dexPath).exists()) {
-            dexPath = yq.classesDexPath;
+        // UI သီးသန့်ခလုတ်ကနေ "action_run_preview" ကို true ပေးပြီး ခေါ်ထားခြင်း ရှိ/မရှိ စစ်ဆေးခြင်း
+        boolean isPreviewAction = build_settings.getValue("action_run_preview", "false").equals("true");
+
+        if (isPreviewAction) {
+            // ၁။ Preview ခလုတ်နှိပ်ခဲ့လျှင် - APK ဆက်မဆောက်တော့ဘဲ classes.dex ကို သုံးပြီး Preview တိုက်ရိုက်ဆွဲဖွင့်မည်
+            String dexPath = yq.binDirectoryPath + File.separator + "dex" + File.separator + "classes.dex";
+            if (!new File(dexPath).exists()) {
+                dexPath = yq.classesDexPath;
+            }
+            pro.sketchware.activities.PreviewRunnerActivity.startPreview(context, dexPath, yq.packageName);
+            
+            // Preview ဖွင့်ပြီးပါက action တန်ဖိုးကို ပုံမှန် (false) ပြန်ပြောင်းပေးခြင်း
+            build_settings.setValue("action_run_preview", "false");
+        } else {
+            // ၂။ ပုံမှန် Run/Build ခလုတ်နှိပ်လျှင် - မူလအတိုင်း စစ်စစ်ပေါက်ပေါက် APK ဆောက်ပြီး Sign လုပ်မည်
+            TestkeySignBridge.signWithTestkey(yq.unsignedUnalignedApkPath, yq.finalToInstallApkPath);
+            
+            String emulatorIp = build_settings.getValue("setting_emulator_ip", "");
+            if (!emulatorIp.isEmpty()) {
+                sendApkToEmulator(emulatorIp, 5555);
+            }
         }
-        
-        pro.sketchware.activities.PreviewRunnerActivity.startPreview(context, dexPath, yq.packageName);
     }
 
     private void mergeDexes(File target, List<Dex> dexes) throws IOException {
