@@ -1,5 +1,7 @@
 package pro.sketchware.activities.preview;
 
+import android.content.Context;
+import android.content.Intent;
 import android.os.Bundle;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -11,6 +13,9 @@ import com.besome.sketch.editor.view.ViewPane;
 import com.besome.sketch.lib.base.BaseAppCompatActivity;
 
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.nio.channels.FileChannel;
 import java.util.ArrayList;
 
 import a.a.a.jC;
@@ -78,7 +83,6 @@ public class LayoutPreviewActivity extends BaseAppCompatActivity {
 
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
-        // Toolbar ညာဘက်အပေါ်ထောင့်တွင် Live Run စမ်းသပ်ရန် ခလုတ်အသစ်ထည့်သွင်းခြင်း
         MenuItem livePreviewItem = menu.add(Menu.NONE, 888, Menu.NONE, "Live Run");
         livePreviewItem.setIcon(android.R.drawable.ic_media_play);
         livePreviewItem.setShowAsAction(MenuItem.SHOW_AS_ACTION_ALWAYS);
@@ -97,7 +101,7 @@ public class LayoutPreviewActivity extends BaseAppCompatActivity {
     }
 
     /**
-     * Compiled ဖြစ်ပြီးသား dex ဖိုင်ကို လမ်းကြောင်းအစုံဖြင့် လိုက်ရှာပြီး Sandbox တွင် ပတ်ပေးခြင်း
+     * အဆင့်မြှင့်တင်ထားသော စမ်းသပ်မောင်းနှင်မှုစနစ် (Android 11 မှ 14 အထိ အလုပ်လုပ်နိုင်သည်)
      */
     private void startInAppLivePreview() {
         if (sc_id == null) {
@@ -108,25 +112,14 @@ public class LayoutPreviewActivity extends BaseAppCompatActivity {
         String dexPath = "";
         boolean found = false;
 
-        // Sketchware Pro v7 အသုံးများသော တည်နေရာလမ်းကြောင်းများစာရင်း
         String[] potentialPaths = new String[]{
-            // ၁။ မူလ နေရာဟောင်း (External Storage)
             android.os.Environment.getExternalStorageDirectory().getAbsolutePath() + "/.sketchware/mysc/" + sc_id + "/bin/classes.dex",
-            
-            // ၂။ Android 11+ Scoped Storage အပြင်ဘက် နေရာ (External App Directory)
             getExternalFilesDir(null) + "/.sketchware/mysc/" + sc_id + "/bin/classes.dex",
-            
-            // ၃။ App ၏ Internal Private Directory
             getFilesDir().getParent() + "/.sketchware/mysc/" + sc_id + "/bin/classes.dex",
-            
-            // ၄။ Android/data/ အတွင်းမှ files နေရာ
             android.os.Environment.getExternalStorageDirectory().getAbsolutePath() + "/Android/data/" + getPackageName() + "/files/.sketchware/mysc/" + sc_id + "/bin/classes.dex",
-            
-            // ၅။ Sketchware Pro ဗားရှင်းအချို့ သုံးလေ့ရှိသော အခြား compiled output နေရာတစ်ခု
             android.os.Environment.getExternalStorageDirectory().getAbsolutePath() + "/sketchware/compiled/" + sc_id + "/classes.dex"
         };
 
-        // လမ်းကြောင်းများကို Loop ပတ်၍ စစ်ဆေးခြင်း
         for (String path : potentialPaths) {
             if (path != null) {
                 File file = new File(path);
@@ -139,11 +132,11 @@ public class LayoutPreviewActivity extends BaseAppCompatActivity {
         }
 
         if (!found) {
-            Toast.makeText(this, "DEX ဖိုင် ရှာမတွေ့သေးပါ။ ဒေတာလမ်းကြောင်း လွဲနေနိုင်သဖြင့် ပရောဂျက်ကို အပြင် Editor တွင် သေချာစွာ တစ်ကြိမ် Run ခဲ့ပေးပါ။", Toast.LENGTH_LONG).show();
+            Toast.makeText(this, "DEX ဖိုင် ရှာမတွေ့သေးပါ။ ပရောဂျက်ကို အပြင် Editor တွင် သေချာစွာ တစ်ကြိမ် Run ခဲ့ပေးပါ။", Toast.LENGTH_LONG).show();
             return;
         }
 
-        // Package Name အား ယူခြင်း (Reflection ကိုသုံး၍ Compilation Error ကင်းဝေးစေရန် စီမံထားပါသည်)
+        // Package Name အား ယူခြင်း
         String packageName = "com.my.newproject"; 
         try {
             if (getIntent().hasExtra("package_name") && getIntent().getStringExtra("package_name") != null) {
@@ -170,8 +163,32 @@ public class LayoutPreviewActivity extends BaseAppCompatActivity {
             packageName = "com.my.project" + sc_id;
         }
 
+        // [ပြင်ဆင်ချက်] Android 11+ Scoped Storage ကန့်သတ်ချက်များကျော်လွှားရန် Private Cache ထဲသို့ DEX အား ကူးယူခြင်း
+        try {
+            File internalDexDir = getDir("preview_dex", Context.MODE_PRIVATE);
+            File internalDexFile = new File(internalDexDir, "classes_" + sc_id + ".dex");
+            
+            File sourceFile = new File(dexPath);
+            try (FileChannel source = new FileInputStream(sourceFile).getChannel();
+                 FileChannel destination = new FileOutputStream(internalDexFile).getChannel()) {
+                destination.transferFrom(source, 0, source.size());
+            }
+            
+            // စိတ်ချရသော Private နေရာအသစ်အား DexPath အဖြစ် ပြောင်းလဲသတ်မှတ်ခြင်း
+            dexPath = internalDexFile.getAbsolutePath();
+        } catch (Exception e) {
+            // ကူးယူ၍မရပါက မူရင်း လမ်းကြောင်းအတိုင်း ဆက်သွားမည်
+        }
+
         Toast.makeText(this, "Live Preview ကို စတင်နေပါပြီ...", Toast.LENGTH_SHORT).show();
-        PreviewRunnerActivity.startPreview(this, dexPath, packageName);
+        
+        // [ပြင်ဆင်ချက်] PreviewRunnerActivity ဆီသို့ UI XML ဒေတာနှင့် လိုအပ်သည်များ အပြည့်အစုံ ပို့ပေးခြင်း
+        Intent intent = new Intent(this, PreviewRunnerActivity.class);
+        intent.putExtra("dex_path", dexPath);
+        intent.putExtra("package_name", packageName);
+        intent.putExtra("xml_content", content); 
+        intent.putExtra("title", title);
+        startActivity(intent);
     }
 
     private ItemView loadView(ViewBean view) {
