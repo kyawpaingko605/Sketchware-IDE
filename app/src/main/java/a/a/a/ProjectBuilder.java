@@ -807,6 +807,12 @@ public class ProjectBuilder {
      */
     public void signDebugApk() throws GeneralSecurityException, IOException, ClassNotFoundException, IllegalAccessException, InstantiationException {
         TestkeySignBridge.signWithTestkey(yq.unsignedUnalignedApkPath, yq.finalToInstallApkPath);
+        
+        // WiFi ADB စနစ်သုံးပြီး Build ဖြစ်လာတဲ့ APK ကို Emulator/ဖုန်း ဆီ လှမ်းပို့မည့်ကုဒ်
+        String emulatorIp = build_settings.getValue("setting_emulator_ip", "");
+        if (!emulatorIp.isEmpty()) {
+            sendApkToEmulator(emulatorIp, 5555);
+        }
     }
 
     private void mergeDexes(File target, List<Dex> dexes) throws IOException {
@@ -1006,5 +1012,36 @@ public class ProjectBuilder {
 
     public void setBuildAppBundle(boolean buildAppBundle) {
         this.buildAppBundle = buildAppBundle;
+    }
+
+    /**
+     * WiFi ADB စနစ်သုံးပြီး Build လုပ်လို့ရလာတဲ့ APK ကို အဝေးက Emulator သို့မဟုတ် ဖုန်းဆီ လှမ်းပို့ပေးမည့်စနစ်
+     */
+    public void sendApkToEmulator(String emulatorIp, int port) {
+        new Thread(() -> {
+            java.net.Socket socket = null;
+            try {
+                LogUtil.d(TAG, "Connecting to Emulator/Device via WiFi ADB: " + emulatorIp + ":" + port);
+                socket = new java.net.Socket(emulatorIp, port);
+                OutputStream outputStream = socket.getOutputStream();
+                FileInputStream fileInputStream = new FileInputStream(yq.finalToInstallApkPath);
+
+                byte[] buffer = new byte[4096];
+                int bytesRead;
+                while ((bytesRead = fileInputStream.read(buffer)) != -1) {
+                    outputStream.write(buffer, 0, bytesRead);
+                }
+                
+                outputStream.flush();
+                fileInputStream.close();
+                LogUtil.d(TAG, "APK successfully streamed to Emulator/Device!");
+            } catch (Exception e) {
+                LogUtil.e(TAG, "Failed to send APK to Emulator via WiFi ADB", e);
+            } finally {
+                if (socket != null) {
+                    try { socket.close(); } catch (IOException ignored) {}
+                }
+            }
+        }).start();
     }
 }
