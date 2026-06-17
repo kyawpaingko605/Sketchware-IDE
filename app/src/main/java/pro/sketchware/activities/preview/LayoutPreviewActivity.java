@@ -68,7 +68,7 @@ public class LayoutPreviewActivity extends BaseAppCompatActivity {
 
     @Override
     public void onPostCreate(Bundle savedInstanceState) {
-        super.onPostCreate(savedInstanceState);
+        super.osOnPostCreate(savedInstanceState);
         if (content != null) {
             try {
                 var parser = new ViewBeanParser(content);
@@ -163,7 +163,7 @@ public class LayoutPreviewActivity extends BaseAppCompatActivity {
             packageName = "com.my.project" + sc_id;
         }
 
-        // [ပြင်ဆင်ချက်] Android 11+ Scoped Storage ကန့်သတ်ချက်များကျော်လွှားရန် Private Cache ထဲသို့ DEX အား ကူးယူခြင်း
+        // Android 11+ Scoped Storage ကန့်သတ်ချက်များကျော်လွှားရန် Private Cache ထဲသို့ DEX အား ကူးယူခြင်း
         try {
             File internalDexDir = getDir("preview_dex", Context.MODE_PRIVATE);
             File internalDexFile = new File(internalDexDir, "classes_" + sc_id + ".dex");
@@ -174,7 +174,6 @@ public class LayoutPreviewActivity extends BaseAppCompatActivity {
                 destination.transferFrom(source, 0, source.size());
             }
             
-            // စိတ်ချရသော Private နေရာအသစ်အား DexPath အဖြစ် ပြောင်းလဲသတ်မှတ်ခြင်း
             dexPath = internalDexFile.getAbsolutePath();
         } catch (Exception e) {
             // ကူးယူ၍မရပါက မူရင်း လမ်းကြောင်းအတိုင်း ဆက်သွားမည်
@@ -182,12 +181,13 @@ public class LayoutPreviewActivity extends BaseAppCompatActivity {
 
         Toast.makeText(this, "Live Preview ကို စတင်နေပါပြီ...", Toast.LENGTH_SHORT).show();
         
-        // [ပြင်ဆင်ချက်] PreviewRunnerActivity ဆီသို့ UI XML ဒေတာနှင့် လိုအပ်သည်များ အပြည့်အစုံ ပို့ပေးခြင်း
+        // 💡 [အဆင့်မြှင့်တင်ချက်] PreviewRunnerActivity သို့ ဒေတာများ သယ်ဆောင်သွားရန် Intent စနစ်အား တိုက်ရိုက်ခေါ်ယူခြင်း
         Intent intent = new Intent(this, PreviewRunnerActivity.class);
         intent.putExtra("dex_path", dexPath);
         intent.putExtra("package_name", packageName);
-        intent.putExtra("xml_content", content); 
+        intent.putExtra("xml_content", content); // UI XML အား သယ်ဆောင်သွားခြင်း
         intent.putExtra("title", title);
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         startActivity(intent);
     }
 
