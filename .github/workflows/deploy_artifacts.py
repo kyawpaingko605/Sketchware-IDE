@@ -9,11 +9,11 @@ def get_git_commit_info():
     commit_hash_short = subprocess.check_output(['git', 'log', '-1', '--pretty=format:%h']).decode('utf-8')
     return commit_author, commit_message, commit_hash, commit_hash_short
 
-# Telegram API credentials
-api_id = int(os.getenv("API_ID"))
-api_hash = os.getenv("API_HASH")
-bot_token = os.getenv("BOT_TOKEN")
-group_id = int(os.getenv("CHAT_ID"))
+# Telegram API credentials (GitHub Secrets နာမည်တွေအတိုင်း တိုက်ရိုက် ချိတ်ဆက်ထားပါတယ်)
+api_id = int(os.getenv("TELEGRAM_API_ID") or os.getenv("API_ID"))
+api_hash = os.getenv("TELEGRAM_API_HASH") or os.getenv("API_HASH")
+bot_token = os.getenv("TELEGRAM_BOT_TOKEN") or os.getenv("BOT_TOKEN")
+group_id = int(os.getenv("TELEGRAM_CHAT_ID") or os.getenv("CHAT_ID"))
 
 # File paths to send
 apk_path = os.getenv("APK_PATH")
@@ -60,13 +60,17 @@ async def send_file(file_path):
     )
 
     try:
+        # TOPIC_ID သို့မဟုတ် TELEGRAM_TOPIC_ID မရှိရင် Error မတက်အောင် စစ်ဆေးခြင်း
+        topic_id_env = os.getenv("TELEGRAM_TOPIC_ID") or os.getenv("TOPIC_ID")
+        reply_to_id = int(topic_id_env) if topic_id_env and topic_id_env.strip() else None
+
         await client.send_file(
             entity=group_id,
             file=file_path,
             parse_mode='markdown',
             caption=message,
             progress_callback=progress,
-            reply_to=int(os.getenv("TOPIC_ID"))
+            reply_to=reply_to_id
         )
         print("\nFile sent successfully")
     except Exception as e:
