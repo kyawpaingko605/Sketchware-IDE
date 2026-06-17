@@ -4,6 +4,7 @@ import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.LinearLayout;
@@ -96,18 +97,16 @@ public class PreviewRunnerActivity extends Activity {
                     setParentMethod.setAccessible(true);
                     setParentMethod.invoke(targetActivityInstance, this);
                 } catch (Exception e2) {
-                    LogUtil.e("PreviewRunner", "Context injection failed: " + e2.getMessage());
+                    Log.e("PreviewRunner", "Context injection failed: " + e2.getMessage());
                 }
             }
 
             // ၂။ Target Activity ရဲ့ onCreate(Bundle) Lifecycle အား တိုက်ရိုက် ခေါ်ယူအလုပ်လုပ်စေခြင်း
-            // ဒီအဆင့်မှာ Target App ထဲက ကုဒ်တွေအားလုံး စတင်ပတ်ပြီး UI တွေ ဖန်တီးသွားမှာဖြစ်ပါတယ်
             Method onCreateMethod = loadedClass.getDeclaredMethod("onCreate", Bundle.class);
             onCreateMethod.setAccessible(true);
             onCreateMethod.invoke(targetActivityInstance, savedInstanceState);
 
             // ၃။ Target App က ဖန်တီးလိုက်တဲ့ အဓိက UI View (Window Content) ကို လှမ်းယူခြင်း
-            // Target Activity ထဲမှာ setContentView လုပ်ခဲ့သမျှ Views တွေကို ဆွဲထုတ်ယူလိုက်တာပါ
             try {
                 Method getWindowMethod = Activity.class.getMethod("getWindow");
                 Object window = getWindowMethod.invoke(targetActivityInstance);
@@ -116,19 +115,17 @@ public class PreviewRunnerActivity extends Activity {
                     View decorView = (View) getDecorViewMethod.invoke(window);
                     
                     if (decorView != null) {
-                        // DecorView ထဲကမှ သန့်စင်သော Content View ကို ရှာဖွေပြီး rootContainer ထဲ ထည့်သွင်းခြင်း
                         View contentView = decorView.findViewById(android.R.id.content);
                         if (contentView instanceof ViewGroup && ((ViewGroup) contentView).getChildCount() > 0) {
                             View realAppUi = ((ViewGroup) contentView).getChildAt(0);
-                            ((ViewGroup) contentView).removeView(realAppUi); // မူလနေရာမှ ခွာထုတ်ခြင်း
-                            rootContainer.addView(realAppUi); // လက်ရှိ Preview မျက်နှာပြင်ထဲ ထည့်သွင်းခြင်း
+                            ((ViewGroup) contentView).removeView(realAppUi);
+                            rootContainer.addView(realAppUi);
                         } else {
                             rootContainer.addView(decorView);
                         }
                     }
                 }
             } catch (Exception e) {
-                // အပေါ်ကအဆင့် အဆင်မပြေပါက အရန်စနစ်အနေဖြင့် သီးသန့်စာသားဖြင့် အောင်မြင်ကြောင်းပြသခြင်း
                 TextView successText = new TextView(this);
                 successText.setText("Successfully initialized " + mainActivityClass + " lifecycle.\n(UI Rendering falls back to basic mode)");
                 successText.setTextSize(16);
