@@ -5,6 +5,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.os.Bundle;
 import android.view.View;
+import android.view.ViewGroup;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
@@ -22,7 +23,7 @@ public class PreviewRunnerActivity extends Activity {
     private static final String EXTRA_DEX_PATH = "dex_path";
     private static final String EXTRA_PACKAGE_NAME = "package_name";
 
-    private LinearLayout container;
+    private LinearLayout rootContainer;
 
     /**
      * ProjectBuilder ကနေ Preview Activity ကို လှမ်းပွင့်ခိုင်းရန်သုံးသည့် Method
@@ -39,13 +40,14 @@ public class PreviewRunnerActivity extends Activity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        // Preview ပြသပေးမည့် Layout အား Dynamic ဆောက်ခြင်း
-        ScrollView scrollView = new ScrollView(this);
-        container = new LinearLayout(this);
-        container.setOrientation(LinearLayout.VERTICAL);
-        container.setPadding(16, 16, 16, 16);
-        scrollView.addView(container);
-        setContentView(scrollView);
+        // အခြေခံ Main Container အား တည်ဆောက်ခြင်း
+        rootContainer = new LinearLayout(this);
+        rootContainer.setOrientation(LinearLayout.VERTICAL);
+        rootContainer.setLayoutParams(new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, 
+                ViewGroup.LayoutParams.MATCH_PARENT
+        ));
+        setContentView(rootContainer);
 
         String dexPath = getIntent().getStringExtra(EXTRA_DEX_PATH);
         String packageName = getIntent().getStringExtra(EXTRA_PACKAGE_NAME);
@@ -55,18 +57,18 @@ public class PreviewRunnerActivity extends Activity {
             return;
         }
 
-        loadAndExecuteDex(dexPath, packageName);
+        loadAndExecuteDex(dexPath, packageName, savedInstanceState);
     }
 
     /**
-     * DexClassLoader သုံးပြီး classes.dex ကို Sketchware အတွင်းထဲမှာတင် တိုက်ရိုက် Load လုပ်၍ ပတ်ခြင်း
+     * DexClassLoader အား အပြည့်အဝသုံး၍ Target MainActivity ရဲ့ UI Lifecycle တစ်ခုလုံးအား ဆွဲတင်ပတ်ခြင်း
      */
-    private void loadAndExecuteDex(String dexPath, String packageName) {
+    private void loadAndExecuteDex(String dexPath, String packageName, Bundle savedInstanceState) {
         try {
             // Optimized DEX သိမ်းဆည်းမည့် Cache Directory တည်ဆောက်ခြင်း
             File optimizedDexOutputDir = getDir("dex_cache", Context.MODE_PRIVATE);
 
-            // DexClassLoader အား သတ်မှတ်ခြင်း
+            // DexClassLoader စနစ်ဖြင့် classes.dex အား လှမ်းဖတ်ခြင်း
             DexClassLoader classLoader = new DexClassLoader(
                     dexPath,
                     optimizedDexOutputDir.getAbsolutePath(),
@@ -74,35 +76,94 @@ public class PreviewRunnerActivity extends Activity {
                     getClassLoader()
             );
 
-            // စမ်းသပ်မည့် App ၏ MainActivity အား ရှာဖွေခြင်း
+            // စမ်းသပ်မည့် App ၏ MainActivity Class ကို ခေါ်ယူခြင်း
             String mainActivityClass = packageName + ".MainActivity";
             Class<?> loadedClass = classLoader.loadClass(mainActivityClass);
 
-            // တကယ်လို့ ၎င်းသည် Activity ဖြစ်ပါက (သို့မဟုတ်) View ပုံဖော်နိုင်သော Constructor ပါက ဆွဲတင်မည်
+            // Target Activity ၏ Instance (အရာဝတ္ထု) ကို Reflection ဖြင့် တည်ဆောက်ခြင်း
             Constructor<?> constructor = loadedClass.getConstructor();
-            Object instance = constructor.newInstance();
+            final Object targetActivityInstance = constructor.newInstance();
 
-            // ၎င်း Class ထဲတွင် UI View ပြန်ပေးမည့် Method သို့မဟုတ် onCreate ကဲ့သို့ စနစ်အား ပတ်ခြင်း
-            // မှတ်ချက်- ဤနေရာတွင် ရိုးရှင်းစွာ စမ်းသပ်ရန် တိုက်ရိုက် View ဖန်တီးမှု သို့မဟုတ် Reflection သုံးနိုင်သည်
-            TextView successText = new TextView(this);
-            successText.setText("Successfully loaded: " + mainActivityClass + "\nRunning in Sandbox Environment.");
-            successText.setTextSize(18);
-            container.addView(successText);
+            // ၁။ Target Activity ထဲသို့ လက်ရှိ Context / Base Context အား လွှဲပြောင်းပေးခြင်း (မဖြစ်မနေလိုအပ်)
+            try {
+                Method attachBaseContextMethod = Activity.class.getDeclaredMethod("attachBaseContext", Context.class);
+                attachBaseContextMethod.setAccessible(true);
+                attachBaseContextMethod.invoke(targetActivityInstance, this);
+            } catch (Exception ignored) {
+                // အကယ်၍ အဆင်မပြေပါက အခြား Method ဖြင့် Context ထည့်သွင်းခြင်း
+                try {
+                    Method setParentMethod = Activity.class.getDeclaredMethod("setParent", Activity.class);
+                    setParentMethod.setAccessible(true);
+                    setParentMethod.invoke(targetActivityInstance, this);
+                } catch (Exception e2) {
+                    LogUtil.e("PreviewRunner", "Context injection failed: " + e2.getMessage());
+                }
+            }
 
-            Toast.makeText(this, "App Preview Started Successfully!", Toast.LENGTH_SHORT).show();
+            // ၂။ Target Activity ရဲ့ onCreate(Bundle) Lifecycle အား တိုက်ရိုက် ခေါ်ယူအလုပ်လုပ်စေခြင်း
+            // ဒီအဆင့်မှာ Target App ထဲက ကုဒ်တွေအားလုံး စတင်ပတ်ပြီး UI တွေ ဖန်တီးသွားမှာဖြစ်ပါတယ်
+            Method onCreateMethod = loadedClass.getDeclaredMethod("onCreate", Bundle.class);
+            onCreateMethod.setAccessible(true);
+            onCreateMethod.invoke(targetActivityInstance, savedInstanceState);
+
+            // ၃။ Target App က ဖန်တီးလိုက်တဲ့ အဓိက UI View (Window Content) ကို လှမ်းယူခြင်း
+            // Target Activity ထဲမှာ setContentView လုပ်ခဲ့သမျှ Views တွေကို ဆွဲထုတ်ယူလိုက်တာပါ
+            try {
+                Method getWindowMethod = Activity.class.getMethod("getWindow");
+                Object window = getWindowMethod.invoke(targetActivityInstance);
+                if (window != null) {
+                    Method getDecorViewMethod = window.getClass().getMethod("getDecorView");
+                    View decorView = (View) getDecorViewMethod.invoke(window);
+                    
+                    if (decorView != null) {
+                        // DecorView ထဲကမှ သန့်စင်သော Content View ကို ရှာဖွေပြီး rootContainer ထဲ ထည့်သွင်းခြင်း
+                        View contentView = decorView.findViewById(android.R.id.content);
+                        if (contentView instanceof ViewGroup && ((ViewGroup) contentView).getChildCount() > 0) {
+                            View realAppUi = ((ViewGroup) contentView).getChildAt(0);
+                            ((ViewGroup) contentView).removeView(realAppUi); // မူလနေရာမှ ခွာထုတ်ခြင်း
+                            rootContainer.addView(realAppUi); // လက်ရှိ Preview မျက်နှာပြင်ထဲ ထည့်သွင်းခြင်း
+                        } else {
+                            rootContainer.addView(decorView);
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                // အပေါ်ကအဆင့် အဆင်မပြေပါက အရန်စနစ်အနေဖြင့် သီးသန့်စာသားဖြင့် အောင်မြင်ကြောင်းပြသခြင်း
+                TextView successText = new TextView(this);
+                successText.setText("Successfully initialized " + mainActivityClass + " lifecycle.\n(UI Rendering falls back to basic mode)");
+                successText.setTextSize(16);
+                rootContainer.addView(successText);
+            }
+
+            Toast.makeText(this, "In-App Run Preview Active!", Toast.LENGTH_SHORT).show();
 
         } catch (ClassNotFoundException e) {
             showError("MainActivity not found in compiled DEX. Make sure the package name is correct.");
         } catch (Exception e) {
-            showError("Runtime Execution Error: " + e.getMessage());
+            showError("Runtime Sandbox Error: " + e.getMessage() + "\n\nTip: If your app uses custom resources/themes, it's recommended to build a full APK.");
         }
     }
 
     private void showError(String message) {
+        ScrollView errorScroll = new ScrollView(this);
+        LinearLayout errorLayout = new LinearLayout(this);
+        errorLayout.setOrientation(LinearLayout.VERTICAL);
+        errorLayout.setPadding(32, 32, 32, 32);
+
+        TextView errorTitle = new TextView(this);
+        errorTitle.setText("Preview Compilation Failed");
+        errorTitle.setTextColor(0xFFFF0000);
+        errorTitle.setTextSize(20);
+        errorTitle.setPadding(0, 0, 0, 16);
+        errorLayout.addView(errorTitle);
+
         TextView errorText = new TextView(this);
         errorText.setText(message);
-        errorText.setTextColor(0xFFFF0000); // အနီရောင်
-        errorText.setTextSize(16);
-        container.addView(errorText);
+        errorText.setTextColor(0xFF333333);
+        errorText.setTextSize(14);
+        errorLayout.addView(errorText);
+
+        errorScroll.addView(errorLayout);
+        rootContainer.addView(errorScroll);
     }
 }
