@@ -78,7 +78,7 @@ public class LayoutPreviewActivity extends BaseAppCompatActivity {
 
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
-        // Toolbar ညာဘက်အပေါ်ထောင့်တွင် Live Run စမ်းသပ်ရန် ခလုတ်အသစ်ထည့်သွင်းခြင်း
+        // Toolbar ပေါ်တွင် Live Run ခလုတ်အား Icon နှင့်တကွ သေချာစွာထည့်သွင်းခြင်း
         MenuItem livePreviewItem = menu.add(Menu.NONE, 888, Menu.NONE, "Live Run");
         livePreviewItem.setIcon(android.R.drawable.ic_media_play);
         livePreviewItem.setShowAsAction(MenuItem.SHOW_AS_ACTION_ALWAYS);
@@ -97,7 +97,7 @@ public class LayoutPreviewActivity extends BaseAppCompatActivity {
     }
 
     /**
-     * Compiled ဖြစ်ပြီးသား dex ဖိုင်ကိုဖတ်ပြီး Sandbox Preview စနစ်သို့ လွှဲပြောင်းပေးခြင်း
+     * Compiled classes.dex အားဖတ်ပြီး PreviewRunnerActivity ထဲတွင် အလုပ်လုပ်စေမည့်စနစ်
      */
     private void startInAppLivePreview() {
         if (sc_id == null) {
@@ -105,32 +105,40 @@ public class LayoutPreviewActivity extends BaseAppCompatActivity {
             return;
         }
 
-        // Sketchware ရဲ့ Project Bin လမ်းကြောင်းထဲမှ classes.dex ကို ရှာဖွေခြင်း
-        File internalStorage = getFilesDir(); // သို့မဟုတ် ပြင်ပ Storage လမ်းကြောင်း
-        String dexPath = internalStorage.getParent() + "/.sketchware/mysc/" + sc_id + "/bin/classes.dex";
-        
-        // အကယ်၍ အပေါ်က လမ်းကြောင်းမတွေ့ပါက ဒုတိယ အရန်လမ်းကြောင်းဖြင့် ထပ်ရှာခြင်း
+        // Sketchware Pro ရဲ့ Internal storage bin folder အောက်က classes.dex ကို လှမ်းရှာခြင်း
+        String dexPath = getFilesDir().getParent() + "/.sketchware/mysc/" + sc_id + "/bin/classes.dex";
         File dexFile = new File(dexPath);
+        
+        // Internal Storage ထဲမှာမတွေ့ပါက External Storage တွင် ထပ်မံရှာဖွေခြင်း
         if (!dexFile.exists()) {
             dexPath = android.os.Environment.getExternalStorageDirectory().getAbsolutePath() + "/.sketchware/mysc/" + sc_id + "/bin/classes.dex";
             dexFile = new File(dexPath);
         }
 
         if (!dexFile.exists()) {
-            Toast.makeText(this, "DEX ဖိုင် ရှာမတွေ့ပါ။ ပရောဂျက်ကို အပြင်မှာ အရင်ဆုံး Run/Compile လုပ်ခဲ့ပေးရန် လိုအပ်ပါတယ်။", Toast.LENGTH_LONG).show();
+            Toast.makeText(this, "DEX ဖိုင် ရှာမတွေ့ပါ။ ပရောဂျက်ကို အပြင်မျက်နှာပြင်မှာ အရင်ဆုံး 'Run/Compile' ပတ်ခဲ့ပေးပါရန် လိုအပ်ပါတယ်။", Toast.LENGTH_LONG).show();
             return;
         }
 
-        // Project Setting ထဲက Package Name ကို လှမ်းယူခြင်း (မရပါက Default သတ်မှတ်ခြင်း)
+        // Package Name ကို ရှာဖွေခြင်းစနစ် (v7 metadata အမှန်ကို သုံးထားပါသည်)
         String packageName = "com.my.newproject"; 
         try {
-            if (jC.b(sc_id) != null && jC.b(sc_id).c() != null) {
-                packageName = jC.b(sc_id).c().packageName;
+            // Sketchware Pro v7 ရဲ့ jC.c(sc_id).c() က ပရောဂျက်ရဲ့ အခြေခံအချက်အလက် (ProjectInfoBean) ကိုပေးပါတယ်
+            if (jC.c(sc_id) != null && jC.c(sc_id).c() != null) {
+                packageName = jC.c(sc_id).c().myPkgName;
             }
-        } catch (Exception ignored) {}
+        } catch (Exception e) {
+            // ဒုတိယ အရန်စနစ်ဖြင့် ထပ်မံကြိုးစားခြင်း
+            try {
+                if (jC.b(sc_id) != null) {
+                    packageName = jC.b(sc_id).myPkgName;
+                }
+            } catch (Exception ignored) {}
+        }
 
-        // Preview Runner အား အလုပ်စတင်စေခြင်း
         Toast.makeText(this, "Live Preview ကို စတင်နေပါပြီ...", Toast.LENGTH_SHORT).show();
+        
+        // Preview Runner အား အချက်အလက်များ လွှဲပြောင်းပေးပြီး ပွင့်စေခြင်း
         PreviewRunnerActivity.startPreview(this, dexPath, packageName);
     }
 
