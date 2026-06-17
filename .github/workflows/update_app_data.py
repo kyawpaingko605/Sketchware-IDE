@@ -8,11 +8,12 @@ import logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 # Constants
-GITHUB_REPO = "Sketchware-Pro/Sketchware-Pro"
+# သင့်ရဲ့ Username/Repository ပုံစံသို့ ပြင်ဆင်ထားပါသည်
+GITHUB_REPO = "kyawpaingko605/Sketchware-Pro"
 GITHUB_TOKEN = os.getenv("GH_ABOUT_APP_WORKFLOW_TOKEN")
 GITHUB_API_BASE = "https://api.github.com"
 GITHUB_ABOUT_APP_FILE = "about.json"
-GITHUB_ABOUT_APP_URL = f"https://raw.githubusercontent.com/Sketchware-Pro/Sketchware-Pro/refs/heads/host/{GITHUB_ABOUT_APP_FILE}"
+GITHUB_ABOUT_APP_URL = f"https://raw.githubusercontent.com/kyawpaingko605/Sketchware-Pro/refs/heads/host/{GITHUB_ABOUT_APP_FILE}"
 
 HEADERS = {
   "Accept": "application/vnd.github+json",
