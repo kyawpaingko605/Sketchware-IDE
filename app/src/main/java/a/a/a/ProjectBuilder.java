@@ -801,18 +801,17 @@ public class ProjectBuilder {
     }
 
     /**
-     * Sign the debug APK file with testkey.
-     * <p>
-     * This method uses apksigner, but kellinwood's zipsigner as fallback.
+     * In-App Run Preview စနစ်အတွက် ပြင်ဆင်ထားသော signDebugApk Method ဖြစ်ပါသည်။
+     * APK ဆက်မဆောက်တော့ဘဲ ထွက်လာသည့် classes.dex ကို Dynamic Load လုပ်ရန် PreviewRunnerActivity ကို တိုက်ရိုက် လှမ်းခေါ်ပေးပါမည်။
      */
     public void signDebugApk() throws GeneralSecurityException, IOException, ClassNotFoundException, IllegalAccessException, InstantiationException {
-        TestkeySignBridge.signWithTestkey(yq.unsignedUnalignedApkPath, yq.finalToInstallApkPath);
+        String dexPath = yq.binDirectoryPath + File.separator + "dex" + File.separator + "classes.dex";
         
-        // WiFi ADB စနစ်သုံးပြီး Build ဖြစ်လာတဲ့ APK ကို Emulator/ဖုန်း ဆီ လှမ်းပို့မည့်ကုဒ်
-        String emulatorIp = build_settings.getValue("setting_emulator_ip", "");
-        if (!emulatorIp.isEmpty()) {
-            sendApkToEmulator(emulatorIp, 5555);
+        if (!new File(dexPath).exists()) {
+            dexPath = yq.classesDexPath;
         }
+        
+        pro.sketchware.activities.PreviewRunnerActivity.startPreview(context, dexPath, yq.packageName);
     }
 
     private void mergeDexes(File target, List<Dex> dexes) throws IOException {
