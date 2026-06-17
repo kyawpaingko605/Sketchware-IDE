@@ -97,7 +97,7 @@ public class LayoutPreviewActivity extends BaseAppCompatActivity {
     }
 
     /**
-     * Compiled ဖြစ်ပြီးသား dex ဖိုင်ကိုဖတ်ပြီး Sandbox Preview စနစ်သို့ လွှဲပြောင်းပေးခြင်း
+     * Compiled ဖြစ်ပြီးသား dex ဖိုင်ကို လမ်းကြောင်းအစုံဖြင့် လိုက်ရှာပြီး Sandbox တွင် ပတ်ပေးခြင်း
      */
     private void startInAppLivePreview() {
         if (sc_id == null) {
@@ -105,28 +105,50 @@ public class LayoutPreviewActivity extends BaseAppCompatActivity {
             return;
         }
 
-        // Sketchware ရဲ့ Project Bin လမ်းကြောင်းထဲမှ classes.dex ကို ရှာဖွေခြင်း
-        String dexPath = getFilesDir().getParent() + "/.sketchware/mysc/" + sc_id + "/bin/classes.dex";
-        File dexFile = new File(dexPath);
-        
-        // အကယ်၍ အပေါ်က လမ်းကြောင်းမတွေ့ပါက ဒုတိယ အရန်လမ်းကြောင်းဖြင့် ထပ်ရှာခြင်း
-        if (!dexFile.exists()) {
-            dexPath = android.os.Environment.getExternalStorageDirectory().getAbsolutePath() + "/.sketchware/mysc/" + sc_id + "/bin/classes.dex";
-            dexFile = new File(dexPath);
+        String dexPath = "";
+        boolean found = false;
+
+        // Sketchware Pro v7 အသုံးများသော တည်နေရာလမ်းကြောင်းများစာရင်း
+        String[] potentialPaths = new String[]{
+            // ၁။ မူလ နေရာဟောင်း (External Storage)
+            android.os.Environment.getExternalStorageDirectory().getAbsolutePath() + "/.sketchware/mysc/" + sc_id + "/bin/classes.dex",
+            
+            // ၂။ Android 11+ Scoped Storage အပြင်ဘက် နေရာ (External App Directory)
+            getExternalFilesDir(null) + "/.sketchware/mysc/" + sc_id + "/bin/classes.dex",
+            
+            // ၃။ App ၏ Internal Private Directory
+            getFilesDir().getParent() + "/.sketchware/mysc/" + sc_id + "/bin/classes.dex",
+            
+            // ၄။ Android/data/ အတွင်းမှ files နေရာ
+            android.os.Environment.getExternalStorageDirectory().getAbsolutePath() + "/Android/data/" + getPackageName() + "/files/.sketchware/mysc/" + sc_id + "/bin/classes.dex",
+            
+            // ၅။ Sketchware Pro ဗားရှင်းအချို့ သုံးလေ့ရှိသော အခြား compiled output နေရာတစ်ခု
+            android.os.Environment.getExternalStorageDirectory().getAbsolutePath() + "/sketchware/compiled/" + sc_id + "/classes.dex"
+        };
+
+        // လမ်းကြောင်းများကို Loop ပတ်၍ စစ်ဆေးခြင်း
+        for (String path : potentialPaths) {
+            if (path != null) {
+                File file = new File(path);
+                if (file.exists()) {
+                    dexPath = path;
+                    found = true;
+                    break;
+                }
+            }
         }
 
-        if (!dexFile.exists()) {
-            Toast.makeText(this, "DEX ဖိုင် ရှာမတွေ့ပါ။ ပရောဂျက်ကို အပြင်မှာ အရင်ဆုံး Run/Compile လုပ်ခဲ့ပေးရန် လိုအပ်ပါတယ်။", Toast.LENGTH_LONG).show();
+        if (!found) {
+            Toast.makeText(this, "DEX ဖိုင် ရှာမတွေ့သေးပါ။ ဒေတာလမ်းကြောင်း လွဲနေနိုင်သဖြင့် ပရောဂျက်ကို အပြင် Editor တွင် သေချာစွာ တစ်ကြိမ် Run ခဲ့ပေးပါ။", Toast.LENGTH_LONG).show();
             return;
         }
 
-        // Package Name အား ယူခြင်း (Compilation Error လုံးဝကင်းဝေးစေရန် Dynamic Structure ဖြင့် ပြင်ဆင်ထားပါသည်)
+        // Package Name အား ယူခြင်း (Reflection ကိုသုံး၍ Compilation Error ကင်းဝေးစေရန် စီမံထားပါသည်)
         String packageName = "com.my.newproject"; 
         try {
             if (getIntent().hasExtra("package_name") && getIntent().getStringExtra("package_name") != null) {
                 packageName = getIntent().getStringExtra("package_name");
             } else if (jC.a(sc_id) != null) {
-                // Obfuscation နှင့် Version ကွဲလွဲမှုများကြောင့် Error မတက်စေရန် Object Type မှတစ်ဆင့် စစ်ဆေးယူခြင်း
                 Object projectInfo = jC.a(sc_id);
                 java.lang.reflect.Field[] fields = projectInfo.getClass().getDeclaredFields();
                 for (java.lang.reflect.Field field : fields) {
@@ -141,7 +163,6 @@ public class LayoutPreviewActivity extends BaseAppCompatActivity {
                 }
             }
         } catch (Exception e) {
-            // လုံးဝမရပါက Default Safe Package Name ကို အသုံးပြုမည်
             packageName = "com.my.project" + sc_id;
         }
 
